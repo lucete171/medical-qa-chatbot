@@ -4,10 +4,13 @@ RAG 모델 모듈
 """
 
 import os
+import shutil
+from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
 from langchain_chroma import Chroma
-from langchain_openai import OpenAIEmbeddings
+# from langchain_openai import OpenAIEmbeddings  # HuggingFace 임베딩 사용으로 주석처리
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough, RunnableLambda
@@ -15,9 +18,86 @@ from langchain_openai import ChatOpenAI
 from langchain_core.documents import Document
 from pydantic import BaseModel, Field
 from sentence_transformers import CrossEncoder
+from huggingface_hub import hf_hub_download
+import torch
 
 # .env 파일 로드
 load_dotenv()
+
+
+def ensure_hf_chroma_assets(
+    persist_dir: str | Path,
+    repo_id: str,
+    repo_type: str = "dataset",
+    sqlite_filename: str = "chroma.sqlite3",
+    zip_filename: str = "ea99f6f7-3cf3-4ae6-8b86-dcabc4b70a9c-20260120T081052Z-1-001.zip",
+    token: Optional[str] = None
+) -> Path:
+    """
+    HF Hub에서 chroma.sqlite3 + zip 파일을 다운로드 후 persist_dir에 배치
+    기존 파일이 존재하면 삭제 후 새로 다운로드
+    
+    Args:
+        persist_dir: ChromaDB 데이터를 저장할 경로
+        repo_id: 허깅페이스 리포지토리 ID
+        repo_type: 리포지토리 타입 (기본값: "dataset")
+        sqlite_filename: SQLite 파일명
+        zip_filename: ZIP 파일명
+        token: HF 토큰 (private 리포지토리인 경우 필요)
+    
+    Returns:
+        persist_dir의 Path 객체
+    """
+    persist_dir = Path(persist_dir).resolve()
+    persist_dir.mkdir(parents=True, exist_ok=True)
+
+    # 실제 앱이 참조할 위치
+    sqlite_dst = persist_dir / sqlite_filename
+    zip_dst = persist_dir / zip_filename
+
+    # 기존 파일이 존재하면 삭제
+    if sqlite_dst.exists():
+        print(f"🗑️  기존 {sqlite_filename} 삭제 중...")
+        sqlite_dst.unlink()
+    
+    if zip_dst.exists():
+        print(f"🗑️  기존 {zip_filename} 삭제 중...")
+        zip_dst.unlink()
+
+    # HF 캐시에 다운로드 (경로 반환)
+    print(f"📥 {sqlite_filename} 다운로드 중...")
+    sqlite_cache = Path(hf_hub_download(
+        repo_id=repo_id,
+        repo_type=repo_type,
+        filename=sqlite_filename,
+        token=token,
+    ))
+    print(f"📥 {zip_filename} 다운로드 중...")
+    zip_cache = Path(hf_hub_download(
+        repo_id=repo_id,
+        repo_type=repo_type,
+        filename=zip_filename,
+        token=token,
+    ))
+
+    # 실제 앱이 참조할 위치로 "복사" (캐시 파일 직접 수정/이동 방지)
+    shutil.copy2(sqlite_cache, sqlite_dst)
+    shutil.copy2(zip_cache, zip_dst)
+    
+    print(f"✅ {sqlite_filename} 다운로드 완료")
+    print(f"✅ {zip_filename} 다운로드 완료")
+
+    return persist_dir
+
+
+def get_device():
+    """사용 가능한 디바이스 반환"""
+    if torch.cuda.is_available():
+        return "cuda"       # NVIDIA GPU
+    elif torch.backends.mps.is_available():
+        return "mps"        # Mac Apple Silicon 
+    else:
+        return "cpu"        # CPU
 
 
 class QueryGeneration(BaseModel):
@@ -30,14 +110,19 @@ class RAGModel:
     
     def __init__(
         self,
-        chromadb_path: str= "./chroma_data" ,
-        collection_name: str = "medical_qa",
-        embedding_model: str = "text-embedding-3-small",
+        chromadb_path: str = "./chromaDB_data",
+        collection_name: str = "med_knowledge",
+        embedding_model: str = "BAAI/bge-m3",
         llm_model: str = "gpt-5-mini",
         temperature: float = 0,
         retrieval_k: int = 10,
-        rerank_top_n: int = 8,
-        rerank_model_name: str = "zeroentropy/zerank-2"
+        rerank_top_n: int = 3,
+        rerank_model_name: str = "zeroentropy/zerank-2",
+        hf_repo_id: str = "yj512/likelion_project2_chromadb",
+        hf_repo_type: str = "dataset",
+        sqlite_filename: str = "chroma.sqlite3",
+        zip_filename: str = "ea99f6f7-3cf3-4ae6-8b86-dcabc4b70a9c-20260120T081052Z-1-001.zip",
+        download_from_hf: bool = True
     ):
         """
         RAG 모델 초기화
@@ -45,12 +130,17 @@ class RAGModel:
         Args:
             chromadb_path: ChromaDB 데이터 경로
             collection_name: ChromaDB 컬렉션 이름
-            embedding_model: Embedding 모델 이름
+            embedding_model: Embedding 모델 이름 (HuggingFace 모델)
             llm_model: LLM 모델 이름
             temperature: LLM temperature
             retrieval_k: 검색할 문서 개수
             rerank_top_n: ReRank 후 반환할 문서 개수
             rerank_model_name: ReRank 모델 이름
+            hf_repo_id: 허깅페이스 리포지토리 ID
+            hf_repo_type: 허깅페이스 리포지토리 타입
+            sqlite_filename: SQLite 파일명
+            zip_filename: ZIP 파일명
+            download_from_hf: 허깅페이스에서 다운로드 여부 (기본값: True)
         """
         # 환경 변수에서 API 키 로드
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -59,11 +149,41 @@ class RAGModel:
         if not self.openai_api_key:
             raise ValueError("OPENAI_API_KEY가 .env 파일에 설정되어 있지 않습니다.")
         
-        # Embedding 모델 초기화
-        self.embeddings = OpenAIEmbeddings(
-            model=embedding_model,
-            openai_api_key=self.openai_api_key
+        # HF_TOKEN이 있으면 사용
+        if self.hf_token:
+            os.environ["HF_TOKEN"] = self.hf_token
+        
+        # 허깅페이스에서 ChromaDB 파일 다운로드
+        if download_from_hf:
+            print("🔄 허깅페이스에서 ChromaDB 파일 다운로드 중...")
+            ensure_hf_chroma_assets(
+                persist_dir=chromadb_path,
+                repo_id=hf_repo_id,
+                repo_type=hf_repo_type,
+                sqlite_filename=sqlite_filename,
+                zip_filename=zip_filename,
+                token=self.hf_token
+            )
+            print("✅ ChromaDB 파일 다운로드 완료")
+        
+        # 디바이스 설정
+        device = get_device()
+        print(f"사용 중인 디바이스: {device}")
+        
+        # Embedding 모델 초기화 (HuggingFace 임베딩 사용)
+        print(f"🔄 임베딩 모델 ({embedding_model}) 로딩 중...")
+        self.embeddings = HuggingFaceEmbeddings(
+            model_name=embedding_model,
+            model_kwargs={'device': device},
+            encode_kwargs={'normalize_embeddings': True}
         )
+        print("✅ 임베딩 모델 로딩 완료")
+        
+        # # OpenAI 임베딩 모델 (주석처리)
+        # self.embeddings = OpenAIEmbeddings(
+        #     model=embedding_model,
+        #     openai_api_key=self.openai_api_key
+        # )
         
         # ChromaDB 벡터 스토어 초기화
         self.vectorstore = Chroma(
@@ -115,10 +235,6 @@ class RAGModel:
         # ReRank 모델 초기화 (초기화 시점에 미리 로드)
         self.rerank_top_n = rerank_top_n
         self.rerank_model_name = rerank_model_name
-        
-        # HF_TOKEN이 있으면 사용
-        if self.hf_token:
-            os.environ["HF_TOKEN"] = self.hf_token
         
         # ReRank 모델을 초기화 시점에 미리 로드 (한 번만 로드되고 재사용)
         print("🔄 ReRank 모델 로딩 중...")
