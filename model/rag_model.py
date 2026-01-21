@@ -235,14 +235,9 @@ class RAGModel:
         # ReRank 모델 초기화 (초기화 시점에 미리 로드)
         self.rerank_top_n = rerank_top_n
         self.rerank_model_name = rerank_model_name
-        
-        # ReRank 모델을 초기화 시점에 미리 로드 (한 번만 로드되고 재사용)
-        print("🔄 ReRank 모델 로딩 중...")
-        self.rerank_model = CrossEncoder(
-            self.rerank_model_name,
-            trust_remote_code=True
-        )
-        print("✅ ReRank 모델 로딩 완료")
+
+        # 🔧 ReRank 모델 lazy loading (처음 rerank가 실제로 필요해질 때 로드)
+        self._rerank_model = None
         
         # ReRank 체인을 초기화 시점에 미리 생성 (재사용)
         self.rerank_chain = (
@@ -286,6 +281,23 @@ class RAGModel:
                 seen.add(key)
                 uniq.append(d)
         return uniq
+
+    def _get_rerank_model(self):
+        """ReRank 모델을 필요 시점에 1회 로드해서 재사용"""
+        if self._rerank_model is None:
+            device = get_device()
+            print("🔄 ReRank 모델 lazy loading...")
+            # CrossEncoder는 내부적으로 HF 모델을 사용하며 device는 'cpu'/'cuda' 문자열을 받음
+            # CUDA 환경이면 float16 사용을 시도하고, 아니면 기본 dtype으로 둠
+            model_kwargs = {"torch_dtype": torch.float16} if device == "cuda" else {}
+            self._rerank_model = CrossEncoder(
+                self.rerank_model_name,
+                trust_remote_code=True,
+                device=device,
+                model_kwargs=model_kwargs,
+            )
+            print("✅ ReRank 모델 로딩 완료")
+        return self._rerank_model
     
     def _rerank_topn(self, payload, top_n: Optional[int] = None):
         """
@@ -306,12 +318,12 @@ class RAGModel:
         
         if not docs:
             return []
-        
-        # ReRank 모델은 이미 초기화 시점에 로드됨
+
+        reranker = self._get_rerank_model()
         scored = []
         for d in docs:
             # batch size 1로 호출 (pad_token 오류 회피)
-            s = float(self.rerank_model.predict([(q, d.page_content)])[0])
+            s = float(reranker.predict([(q, d.page_content)])[0])
             scored.append((s, d))
         
         scored.sort(key=lambda x: x[0], reverse=True)
@@ -334,9 +346,6 @@ class RAGModel:
         """
         # 질문 처리 (항상 ReRank 포함)
         if config:
-            result = self.rag_chain.invoke(question, config=config)
-        else:
-            result = self.rag_chain.invoke(question)
-        
-        return result
+            return self.rag_chain.invoke(question, config=config)
+        return self.rag_chain.invoke(question)
 
