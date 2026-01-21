@@ -1,0 +1,17 @@
+# PyTorch CPU 버전 (기본)
+# CUDA 버전이 필요한 경우 아래 주석을 해제하고 CPU 버전을 주석 처리하세요
+# --extra-index-url https://download.pytorch.org/whl/cu118  # CUDA 11.8
+# --extra-index-url https://download.pytorch.org/whl/cu121  # CUDA 12.1
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
+torchaudio
+langchain-core
+langchain-openai
+langchain-community
+langchain-chroma
+python-dotenv
+sentence-transformers
+pydantic
+transformers
+hf_xet

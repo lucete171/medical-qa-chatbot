@@ -1,0 +1,10 @@
+fastapi>=0.110
+uvicorn>=0.23
+
+numpy>=1.26,<2.3
+pandas>=2.0
+scikit-learn>=1.4,<1.8
+joblib
+
+python-multipart
+websockets
