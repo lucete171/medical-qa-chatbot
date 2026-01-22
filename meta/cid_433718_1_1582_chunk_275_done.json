@@ -1,0 +1,31 @@
+{
+  "src_path": "/content/drive/MyDrive/Colab Notebooks/실전 프로젝트 2/DATA/TS_국문_학회 가이드라인/cid_433718_1_1582.json",
+  "ts_folder": "drive",
+  "file_name": "cid_433718_1_1582.json",
+  "base": "cid_433718_1_1582",
+  "chunk_id": 275,
+  "content": "환자에서 초치료로 MMF의 사용을 권고한다(근거수준: 낮음, 권고등급: 조건부 권고 경증의 SSc-ILD (평균 FVC 82 HRCT 폐 섬유화 정도 2-17 환자에서 IL-6 수용체 대한 단클론항체 치료제인 tocilizumab에 대한 PICO를 선정하고, 체 계적인 문헌고찰과 메타분석을 시행하였다. 두편의 무작위대조군연구와 한편의 비무작위연구가 선택되었고, 초 기의 SSc 환자에서 위약에 비해서 tocilizumab의 사용은 통계적으로 유의하게 FVC의 보존효과가 확인되었다 (FVC mean difference: 5.00, 95% CI: 3.70-6.30, p<0.01) 53-55 . 따라서, 초기의 SSc-ILD 초 치료로 tocilizumab 을 고려할 수 있다(근거수준: 중등도, 권고등급: 조건부 권고 통상적인 스테로이드와 면역억제제의 사용에도 지 속적으로 폐기능이 저하되는 중등도-중증의 환자에서 rituximab의 효과에 대한 PICO를 설정하고, 체계적인 문 헌고찰과 메타분석을 시행하였고, 두편의 무작위대조군연구와 네편의 비무작위연구가 선정되었다 56-61 . B림프구 의 표면에서만 선택적으로 발현되는 CD20에 대한 단클론항체로 B림프구를 고갈시키는 rituximab은 통상적인 스테로이드와 면역억제제의 사용에도 지속적으로 폐기능이 저하되고 진행하는 중등도-중증의 환자에서 유의미 한 FVC 보존 효과를 보여주었다(FVC mean difference: 3.66, 95% CI: 0.61-6.71, p=0.02 따라서 기존의 치료 에도 진행하는 중등도-중증의 SSc-ILD 환자에서 rituximab의 사용을 고려할 수 있다(근거수준: 낮음, 권고등급: 조건부 권고 현재 항섬유화제 및 생물학적제제를 포함한 다양한 약제와 비약물적 방법 등, 치료에 대한 연구가 154 \b 3. 결체조직질환 연관 간질성폐질환 III. 치료 진행되고 있다. 폐기능 보존 뿐만 아니라, 폐외 증상 및 약제의 부작용을 고려하고 기존의 치료에 대한 반응을 평 가하여 추가적 약물 치료",
+  "_chunk_path": "/content/meta/_chunk_store/drive/cid_433718_1_1582_chunk_275.json",
+  "_done_path": "/content/meta/_chunk_store/drive/cid_433718_1_1582_chunk_275_done.json",
+  "keywords": [
+    "tocilizumab",
+    "rituximab",
+    "mmf",
+    "scleroderma-interstitial-lung-disease",
+    "fvc",
+    "il-6",
+    "cd20",
+    "immunosuppressive",
+    "steroid",
+    "pulmonary-function",
+    "fibrosis"
+  ],
+  "procedure_type": [],
+  "target_area": [
+    "lung"
+  ],
+  "symptoms": [
+    "pulmonary-function-decline",
+    "fibrosis"
+  ]
+}
